@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Laporan Penjualan</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    :root {
+      --primary: #4e73df;
+      --secondary: #f8f9fc;
+      --accent: #1cc88a;
+      --text-dark: #343a40;
+      --text-light: #6c757d;
+    }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background-color: var(--secondary);
+      color: var(--text-dark);
+      padding: 20px;
+      max-width: 600px;
+      margin: auto;
+    }
+    h2, h3 {
+      color: var(--primary);
+    }
+    label {
+      font-weight: bold;
+      display: block;
+      margin-top: 10px;
+    }
+    input, select, button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 1em;
+      box-sizing: border-box;
+    }
+    button {
+      background-color: var(--primary);
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+    button:hover {
+      background-color: #2e59d9;
+    }
+    .produk-item {
+      background: white;
+      padding: 15px;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      margin-bottom: 15px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+      position: relative;
+    }
+    .produk-item .hapus-btn {
+      position: relative;
+      top: 10px;
+      right: 0px;
+      margin-bottom: 10px;
+      background: crimson;
+      border: none;
+      color: white;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-size: 0.8em;
+      cursor: pointer;
+    }
+    .rekap {
+      margin-top: 30px;
+      background: #fff;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.05);
+    }
+    ul {
+      list-style: none;
+      padding-left: 0;
+    }
+    li {
+      margin-bottom: 15px;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 10px;
+    }
+    .total {
+      font-weight: bold;
+      color: var(--accent);
+    }
+    .metode {
+      font-size: 0.9em;
+      color: var(--text-light);
+    }
+    .btn-tambah {
+      background-color: var(--accent);
+    }
+    .btn-tambah:hover {
+      background-color: #17a673;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Input Penjualan (Multi Produk)</h2>
+
+  <div id="produkContainer"></div>
+  <button class="btn-tambah" onclick="tambahProduk()">+ Tambah Produk</button>
+
+  <div id="totalBox" style="margin-top: 15px; font-weight:bold; font-size:1.1em; color: #1cc88a;"></div>
+
+  <label>Metode Pembayaran</label>
+  <select id="metode">
+    <option value="Tunai">Tunai</option>
+    <option value="QRIS">QRIS</option>
+    <option value="Transfer">Transfer</option>
+  </select>
+
+  <button onclick="kirimTransaksi()">Kirim Transaksi</button>
+
+  <div class="rekap">
+    <h3>Rekap Transaksi</h3>
+    <ul id="listTransaksi"></ul>
+  </div>
+
+  <button onclick="downloadCSV()" class="btn-tambah" style="margin-top: 20px; background-color:#1cc88a;">
+    Download Rekap (CSV)
+  </button>
+
+<script>
+const hargaProduk = {
+  "Mi Lidi Original": 5000,
+  "Mi Lidi Pedas": 5000,
+  "Es Teh": 4000
+};
+
+const produkContainer = document.getElementById("produkContainer");
+const transaksi = [];
+let indexProduk = 0;
+
+function buatItemProduk(index) {
+  const div = document.createElement("div");
+  div.className = "produk-item";
+  div.id = `produkItem-${index}`;
+
+  let html = `
+    <label>Nama Produk</label>
+    <select class="produk" onchange="hitungSubtotal(${index})">
+      <option value="">-- Pilih Produk --</option>
+      <option value="Mi Lidi Original">Mi Lidi Original</option>
+      <option value="Mi Lidi Pedas">Mi Lidi Pedas</option>
+      <option value="Es Teh">Es Teh</option>
+    </select>
+
+    <label>Jumlah</label>
+    <input type="number" class="jumlah" min="1" oninput="hitungSubtotal(${index})" />
+
+    <div id="subtotal-${index}" style="margin-top:10px; color:green;"></div>
+  `;
+
+  if (index > 0) {
+    html += `<button class="hapus-btn" onclick="hapusProduk(${index})">Hapus</button>`;
+  }
+
+  div.innerHTML = html;
+  produkContainer.appendChild(div);
+}
+
+function hitungSubtotal(index) {
+  const item = document.getElementById(`produkItem-${index}`);
+  if (!item) return;
+
+  const produk = item.querySelector(".produk").value;
+  const jumlah = parseInt(item.querySelector(".jumlah").value || 0);
+  const subtotal = (hargaProduk[produk] || 0) * jumlah;
+
+  const subtotalDiv = document.getElementById(`subtotal-${index}`);
+  subtotalDiv.textContent = produk && jumlah ? `Subtotal: Rp${subtotal.toLocaleString()}` : "";
+
+  tampilkanTotalSemua();
+}
+
+function tampilkanTotalSemua() {
+  let total = 0;
+  for (let i = 0; i < indexProduk; i++) {
+    const item = document.getElementById(`produkItem-${i}`);
+    if (!item) continue;
+
+    const produk = item.querySelector(".produk").value;
+    const jumlah = parseInt(item.querySelector(".jumlah").value || 0);
+    total += (hargaProduk[produk] || 0) * jumlah;
+  }
+
+  let totalBox = document.getElementById("totalBox");
+  if (!totalBox) {
+    totalBox = document.createElement("div");
+    totalBox.id = "totalBox";
+    totalBox.style = "margin-top: 15px; font-weight:bold; font-size:1.1em; color: #1cc88a;";
+    produkContainer.appendChild(totalBox);
+  }
+  totalBox.textContent = total > 0 ? `Total Sementara: Rp${total.toLocaleString()}` : "";
+}
+
+function tambahProduk() {
+  buatItemProduk(indexProduk);
+  indexProduk++;
+}
+
+function hapusProduk(index) {
+  const elemen = document.getElementById(`produkItem-${index}`);
+  if (elemen) elemen.remove();
+  tampilkanTotalSemua();
+}
+
+function kirimTransaksi() {
+  const produkItems = document.querySelectorAll(".produk-item");
+  const metode = document.getElementById("metode").value;
+
+  if (produkItems.length === 0) {
+    alert("Belum ada produk yang diinput.");
+    return;
+  }
+
+  let detail = [];
+  let total = 0;
+
+  produkItems.forEach(p => {
+    const nama = p.querySelector(".produk").value;
+    const jumlah = parseInt(p.querySelector(".jumlah").value || 0);
+    const harga = hargaProduk[nama] || 0;
+    const subtotal = harga * jumlah;
+
+    if (nama && jumlah > 0) {
+      detail.push(`${nama} x${jumlah} = Rp${subtotal.toLocaleString()}`);
+      total += subtotal;
+    }
+  });
+
+  if (detail.length === 0) {
+    alert("Masukkan minimal 1 produk dengan jumlah lebih dari 0.");
+    return;
+  }
+
+  const waktu = new Date().toLocaleString();
+
+  transaksi.push({
+    waktu,
+    metode,
+    totalSemua: total,
+    detail
+  });
+
+  fetch("https://script.google.com/macros/s/AKfycbwAzff0dSP72_XmyTTaeEqQAe-OSqUrTgFsXJ1K46gQNs7zmVrdRMX8YiJOU8Oju2at/exec", {
+    method: "POST",
+    mode: "no-cors",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      waktu,
+      metode,
+      total,
+      detail
+    })
+  });
+
+  tampilkanTransaksi();
+  resetForm();
+  alert("Transaksi berhasil dikirim ke spreadsheet!");
+}
+
+function tampilkanTransaksi() {
+  const list = document.getElementById("listTransaksi");
+  if (!list) return;
+  list.innerHTML = "";
+  transaksi.forEach((trx) => {
+    list.innerHTML += `<li>
+      <b>${trx.waktu}</b><br>
+      ${trx.detail.join("<br>")}<br>
+      <span class="metode">Metode: ${trx.metode}</span><br>
+      <div class="total">Total: Rp${trx.totalSemua.toLocaleString()}</div>
+    </li>`;
+  });
+}
+
+function resetForm() {
+  produkContainer.innerHTML = "";
+  indexProduk = 0;
+  tambahProduk();
+  document.getElementById("metode").value = "Tunai";
+  const totalBox = document.getElementById("totalBox");
+  if (totalBox) totalBox.textContent = "";
+}
+
+function downloadCSV() {
+  if (transaksi.length === 0) {
+    alert("Belum ada transaksi yang bisa diunduh.");
+    return;
+  }
+
+  let csv = "Waktu,Metode Pembayaran,Produk,Jumlah,Subtotal,Total Transaksi\n";
+
+  transaksi.forEach(trx => {
+    trx.detail.forEach(detailLine => {
+      const match = detailLine.match(/^(.*?) x(\d+) = Rp([\d.]+)/);
+      if (match) {
+        const nama = match[1];
+        const jumlah = match[2];
+        const subtotal = match[3].replace(/\./g, "");
+        csv += `"${trx.waktu}","${trx.metode}","${nama}",${jumlah},${subtotal},${trx.totalSemua}\n`;
+      }
+    });
+  });
+
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = window.URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.setAttribute("href", url);
+  a.setAttribute("download", `RekapTransaksi-${new Date().toISOString().slice(0,10)}.csv`);
+  a.click();
+}
+
+tambahProduk();
+</script>
+
+</body>
+</html>
